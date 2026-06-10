@@ -1,5 +1,14 @@
 # percona-toolkit-sample
 
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker_Compose-v2-2496ED?logo=docker&logoColor=white)
+![Percona Server](https://img.shields.io/badge/Percona_Server-8.0-F58722)
+![Percona Toolkit](https://img.shields.io/badge/Percona_Toolkit-pt--*-F58722)
+![MySQL](https://img.shields.io/badge/MySQL-Replication-4479A1?logo=mysql&logoColor=white)
+![binlog](https://img.shields.io/badge/binlog-STATEMENT-4479A1)
+![Bash](https://img.shields.io/badge/Scripts-Bash-4EAA25?logo=gnubash&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 `pt-table-checksum` / `pt-table-sync` / `pt-online-schema-change` / `pt-query-digest` の 4 ツールを Docker Compose で実演するサンプル。Percona Server 8.0 の source / replica と Percona Toolkit コンテナを 3 本立てて、レプリ構築 → 差分注入 → 検出 → 修復 → 無停止 ALTER → スロークエリ集計 をスクリプト一発で再現する。
 
 ## これは何か
