@@ -27,7 +27,7 @@ sequenceDiagram
     par 継続書き込み
         App->>U: INSERT/UPDATE/DELETE
         U->>Trg: AFTER 各行
-        Trg->>N: 同じ変更を写経
+        Trg->>N: 同じ変更を反映
     and 既存行コピー
         pt->>U: chunk 単位で SELECT
         pt->>N: INSERT LOW_PRIORITY IGNORE
@@ -98,8 +98,8 @@ END
 
 **ポイント**:
 
-- `REPLACE INTO` を使うので、shadow コピー中に同じ PK が衝突しても新しい行で上書きされる (= 並走の順序を気にしなくていい)
-- `CONTINUE HANDLER FOR 1146 begin end;` は「Table doesn't exist」エラーの保険。RENAME の 0.x ms の間に shadow テーブルが瞬間的に「存在しない」状態になっても黙ってスルー
+- `REPLACE INTO` を使っているため、shadow コピー中に同じ PK の衝突が発生しても新しい行で上書きされ、並走順序を意識せずに済む設計になっている
+- `CONTINUE HANDLER FOR 1146 begin end;` は「Table doesn't exist」エラーに対する保険。RENAME の瞬間に shadow テーブルが一時的に存在しないタイミングが生じても、その状態をエラーにせず処理を続行する
 - `<=>` は NULL-safe equal。`id` が NULL でも比較が成立する
 
 ## 実行ログ
@@ -133,8 +133,8 @@ mysql> SELECT COUNT(*) FROM shop.users WHERE email LIKE 'osc-%';
 20  -- replica
 ```
 
-## ハマりどころ
+## 注意点
 
-- **外部キー**: 子テーブルが元テーブルを参照していると、RENAME 後に元テーブル名が `_users_old` に変わり外部キーが切れる。`--alter-foreign-keys-method` で挙動を選ぶ
-- **トリガが既にある**: pt-OSC が自前のトリガを乗せる前に元テーブルに既存トリガがあると衝突する
-- **長時間 ALTER**: chunk コピー中はずっとトリガが乗っているので、TPS が高い環境ではトリガオーバーヘッドの分だけアプリのレスポンスが少し悪化する
+- **外部キー**: 子テーブルが元テーブルを参照していると、RENAME 後に元テーブル名が `_users_old` に変わるため外部キーが切れる。`--alter-foreign-keys-method` で挙動を選ぶ
+- **既存トリガとの競合**: pt-OSC が独自のトリガを設置する前に元テーブルに既存のトリガがあると競合する
+- **長時間 ALTER**: chunk コピー中はトリガが有効な状態が続くため、TPS が高い環境ではトリガオーバーヘッド分のレスポンス影響が出る

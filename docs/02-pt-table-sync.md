@@ -68,9 +68,9 @@ docker compose exec toolkit pt-table-sync \
 | **GroupBy** | 全カラムで `GROUP BY` + `COUNT(*)` 比較 | 主キーが無いテーブル |
 | **Stream** | テーブル全体を一気に読んで比較 | 適切なインデックスが無い最終手段 |
 
-## ハマりどころ
+## 注意点
 
-- **`--sync-to-source` は STATEMENT 必須**: source で実行した SQL を replica で再実行する仕組みに乗るため、ROW フォーマットではトリガが意図通りに動かないケースがある
-- **`--bidirectional` (双方向)** は制約が厳しい: 独立サーバ間のみ・Chunk 必須・2 台限定・**DELETE 非対応**。基本は片方向
-- **データを書き換える破壊的ツール**: 本番は必ず `--print` で目視確認してから `--execute`
+- **`--sync-to-source` は STATEMENT フォーマット前提**: source で実行した SQL を binlog 経由で replica に伝播させる仕組みのため、ROW フォーマットでは想定通りに動作しないケースがある
+- **`--bidirectional` (双方向)** は制約が大きい: 独立サーバ間のみ、Chunk 必須、2 台限定、DELETE 非対応。基本は片方向で運用する
+- **データを書き換える操作**: 本番では必ず `--print` で SQL を確認してから `--execute` に進む
 - **外部キーのある子テーブルへの意図しない DELETE に注意**

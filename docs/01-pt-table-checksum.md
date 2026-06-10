@@ -64,8 +64,8 @@ docker compose exec toolkit pt-table-checksum \
 
 `set -e` 中だと差分検出時 (exit=2 等) で誤って異常終了扱いになる。`|| true` で受ける。
 
-## ハマりどころ
+## 注意点
 
-- **小テーブルで Skip される**: `EXPLAIN` の rows 推定が 0 〜 1 行に丸まる小テーブルでも実際は数千行ある事がある。`--chunk-size-limit` を 20 以上にすると通る
-- **replica が見えない**: `--report-host` を replica に渡しておかないと `SHOW REPLICAS` の Host 列が空になり、`--recursion-method=hosts` が失敗する
-- **caching_sha2_password で繋がらない**: `IDENTIFIED WITH mysql_native_password` を明示する
+- **小テーブルがスキップされる**: `EXPLAIN` の rows 推定が 0 〜 1 行に丸まる小テーブルでも、実際の行数は数千件あることがある。ツールは安全側に倒してスキップするので、`--chunk-size-limit` を 20 以上に設定すると対象に含められる
+- **replica が検出されない**: `--report-host` を replica に渡しておかないと `SHOW REPLICAS` の Host 列が空になり、`--recursion-method=hosts` での解決ができなくなる
+- **caching_sha2_password で接続できない**: 同梱の Perl DBD::mysql が未対応のため、`IDENTIFIED WITH mysql_native_password` を明示する

@@ -121,24 +121,24 @@ sequenceDiagram
     U->>Trg:  AFTER 行
     Trg->>N:  同じ変更を _users_new にも適用
     pt->>U:   chunk 単位で SELECT
-    pt->>N:   INSERT LOW_PRIORITY IGNORE で写経
+    pt->>N:   INSERT LOW_PRIORITY IGNORE でコピー
     pt->>U:   RENAME users → _users_old, _users_new → users (アトミック)
     pt->>U:   DROP _users_old
     pt->>Trg: DROP TRIGGER × 3
 ```
 
-## ハマりどころ
+## 環境依存の注意点
 
-1. **`docker-entrypoint-initdb.d` の SQL が途中で失敗すると、以降の `.sql` が走らない**
-   - 02-seed.sql で `cte_max_recursion_depth` を `SET SESSION` し忘れて再帰 1001 を踏むと、その後の `03-users.sql` の `CREATE USER` が走らず `repl` ユーザ自体が存在しない、という連鎖死を起こす。スクリプトの先頭で `SET SESSION cte_max_recursion_depth = 100000;` を必ず入れる。
-2. **`perconalab/percona-toolkit` の Perl DBD::mysql が `caching_sha2_password` 非対応**
-   - MySQL 8.0 のデフォルト認証プラグインだと pt-* がそもそも繋がらない。`CREATE USER ... IDENTIFIED WITH mysql_native_password BY '...'` で明示する。
-3. **`pt-table-checksum` が `--recursion-method=hosts` で replica を見つけられない**
-   - replica 側に `--report-host=replica` を渡しておかないと、source の `SHOW REPLICAS` に `Host` が空で出てきて pt-table-checksum が「どこに繋げばいいか分からない」状態になる。
-4. **`pt-table-checksum` が大きなテーブルを「one chunk で済むはずだが行が多すぎる」と Skip する**
-   - EXPLAIN の行数推定が 0 〜 1 行に丸まる小テーブルでも、実際は数千行ある。`--chunk-size-limit=20` のように比率を大きめにすると通る。
+1. **`docker-entrypoint-initdb.d` の SQL が途中で失敗すると、以降の `.sql` が実行されない**
+   - 02-seed.sql で `cte_max_recursion_depth` を `SET SESSION` し忘れて再帰 1001 を踏むと、その後の `03-users.sql` の `CREATE USER` が実行されず、`repl` ユーザが存在しない状態で起動完了する。SQL の先頭で `SET SESSION cte_max_recursion_depth = 100000;` を入れておくと安全。
+2. **`perconalab/percona-toolkit` 同梱の Perl DBD::mysql は `caching_sha2_password` に未対応**
+   - MySQL 8.0 のデフォルト認証プラグインのままだと pt-* ツールから接続できない。`CREATE USER ... IDENTIFIED WITH mysql_native_password BY '...'` で明示する。
+3. **`pt-table-checksum --recursion-method=hosts` で replica が検出されない**
+   - replica 側に `--report-host=replica` を渡しておかないと、source の `SHOW REPLICAS` に `Host` が空で表示され、pt-table-checksum の接続先解決が成立しない。
+4. **`pt-table-checksum` が大きなテーブルをスキップする場合がある**
+   - `EXPLAIN` の行数推定が 0 〜 1 行に丸まる小テーブルでも実際は数千行ある場合、ツールは安全側に倒してスキップする。`--chunk-size-limit=20` のように比率を大きく取ると対象に含められる。
 5. **`mysqldump --databases shop` には `mysql.user` が含まれない**
-   - replica は `shop` だけ受け取って `repl` / `toolkit` ユーザを持たないので、`START REPLICA` 時に Authentication 失敗。setup スクリプトの末尾で replica 側にもユーザを別途 CREATE しておく。
+   - replica は `shop` のみを受け取り、`repl` / `toolkit` ユーザを持たない状態で起動する。`START REPLICA` 直後に認証エラーになるため、setup スクリプトの末尾で replica 側にも CREATE USER しておく。
 
 ## 後始末
 
