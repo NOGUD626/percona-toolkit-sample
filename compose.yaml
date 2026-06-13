@@ -58,7 +58,8 @@ services:
         condition: service_healthy
 
   toolkit:
-    image: perconalab/percona-toolkit:latest
+    image: perconalab/percona-toolkit:3.7.1
+    platform: linux/amd64
     container_name: pt-toolkit
     # ツール実行は scripts/*.sh から `docker compose exec` で呼び出すので待機させる
     entrypoint: ["sleep", "infinity"]

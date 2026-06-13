@@ -14,6 +14,7 @@ UPDATE users SET name = 'DRIFTED-USER-0001' WHERE id = 1;
 DELETE FROM users WHERE id = 2;
 
 -- 3. INSERT: replica にだけ存在する余計な行
+DELETE FROM users WHERE id = 99999 OR email = 'ghost@replica.local';
 INSERT INTO users (id, email, name) VALUES (99999, 'ghost@replica.local', 'GhostOnReplica');
 
 -- 4. products: 価格をズラす

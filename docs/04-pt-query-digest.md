@@ -49,7 +49,7 @@ command: >
 
 - 軽い SELECT を 200 回 (`SELECT COUNT(*) FROM users WHERE status='active'`)
 - JOIN + GROUP BY を 30 回 (`users LEFT JOIN orders GROUP BY ORDER BY LIMIT 10`)
-- index 未使用な LIKE スキャンを 5 回 (`access_log WHERE path LIKE '%items%'`)
+- index 未使用な LIKE スキャンを 20 回 (`access_log WHERE path LIKE '%items%'`)
 
 を順に流して slowlog を作る。
 
@@ -74,7 +74,7 @@ command: >
 
 - `Calls=30` の JOIN クエリが合計時間トップになりがち (1 回が重い)
 - `Calls=200` の単純 COUNT(*) は単発は軽いが合計時間で 2 位に来る (積み上げが効く)
-- `Calls=5` の LIKE フルスキャンは V/M (分散) が大きく、個別問題として浮かぶ
+- `Calls=20` の LIKE フルスキャンは V/M (分散) が大きく、個別問題として浮かぶ
 
 このように **「コール数」「単発の重さ」「合計時間」** の 3 軸で別々の問題が浮かぶのが pt-query-digest の旨み。
 

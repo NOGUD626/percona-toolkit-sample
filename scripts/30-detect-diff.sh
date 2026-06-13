@@ -3,7 +3,7 @@
 #
 # 各行 1 チャンク。this_crc/this_cnt が replica 側、source_crc/source_cnt が source 側。
 # どちらかが食い違っていれば差分あり。
-set -uo pipefail
+set -euo pipefail
 
 echo "== pt-table-checksum 実行 (差分あれば非ゼロ終了するので || true) =="
 bash "$(dirname "$0")/10-checksum-clean.sh" | tail -10 || true

@@ -10,7 +10,7 @@
 # オプション:
 #   --recursion-method=hosts : SHOW REPLICAS で replica を見つける (replica に
 #                              report-host が必要)
-#   --chunk-size-limit=0     : 行数推定が過大でもチャンク分割をスキップさせない
+#   --chunk-size-limit=20    : 行数推定がブレてもチャンク分割をスキップさせにくくする
 #   --no-check-binlog-format : STATEMENT 以外でも警告で止めない
 set -euo pipefail
 

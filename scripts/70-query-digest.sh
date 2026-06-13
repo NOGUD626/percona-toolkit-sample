@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # pt-query-digest: slowlog の集計
 #
-# my.cnf で long_query_time=0 にしているため、source が受けたすべてのクエリが
+# compose.yaml の command で long_query_time=0 にしているため、source が受けたすべてのクエリが
 # /var/lib/mysql/slow.log に流れている。
 # このスクリプトでは
 #   1) 重めのワークロードを source 内部で 1 セッションで投げる
 #      (docker compose exec のオーバーヘッドを避けるため heredoc で一気に流す)
 #   2) slowlog を pt-query-digest に通して TOP クエリを抽出
-set -uo pipefail
+set -euo pipefail
 
 SOURCE="docker compose exec -T source mysql -uroot -prootpass"
 
+echo "== slowlog を空にする =="
+docker compose exec -T source bash -lc "truncate -s 0 /var/lib/mysql/slow.log"
+
 echo "== ワークロードを 1 セッションで流す =="
-$SOURCE 2>/dev/null <<'SQL'
+$SOURCE >/dev/null 2>/dev/null <<'SQL'
 USE shop;
 SET SESSION cte_max_recursion_depth = 100000;
 
@@ -46,13 +49,13 @@ END//
 DELIMITER ;
 CALL bench_join();
 
--- index 未使用な full scan を 5 回
+-- index 未使用な full scan を 20 回
 DROP PROCEDURE IF EXISTS bench_scan;
 DELIMITER //
 CREATE PROCEDURE bench_scan()
 BEGIN
   DECLARE i INT DEFAULT 0;
-  WHILE i < 5 DO
+  WHILE i < 20 DO
     SELECT COUNT(*) AS c FROM access_log WHERE path LIKE '%items%';
     SET i = i + 1;
   END WHILE;
@@ -75,4 +78,4 @@ docker cp /tmp/slow.log pt-toolkit:/tmp/slow.log
 
 echo
 echo "== pt-query-digest --limit 3 =="
-docker compose exec -T toolkit pt-query-digest --limit 3 /tmp/slow.log 2>&1 | sed -n '1,120p'
+docker compose exec -T toolkit sh -lc "pt-query-digest --limit 3 /tmp/slow.log 2>&1 | sed -n '1,120p'"

@@ -11,9 +11,10 @@ set -euo pipefail
 
 SOURCE="docker compose exec -T source mysql -uroot -prootpass"
 REPLICA="docker compose exec -T replica mysql -uroot -prootpass"
+HOST_DUMP=$(mktemp "${TMPDIR:-/tmp}/pt-source-dump.XXXXXX.sql")
+trap 'rm -f "$HOST_DUMP"' EXIT
 
 echo "== source -> dump 取得 =="
-DUMP=/tmp/source-dump.sql
 docker compose exec -T source bash -lc "mysqldump -uroot -prootpass \
   --source-data=2 --single-transaction --routines --triggers \
   --databases shop > /tmp/source-dump.sql && wc -l /tmp/source-dump.sql"
@@ -24,15 +25,21 @@ FILE=$(echo "$POS_LINE" | sed -E "s/.*MASTER_LOG_FILE='([^']+)'.*/\1/")
 POS=$(echo  "$POS_LINE" | sed -E "s/.*MASTER_LOG_POS=([0-9]+).*/\1/")
 echo "file=${FILE} pos=${POS}"
 
+echo "== replica の既存レプリケーション設定と shop DB をリセット =="
+$REPLICA -e "STOP REPLICA;" 2>/dev/null || true
+$REPLICA -e "RESET REPLICA ALL;" 2>/dev/null || true
+$REPLICA <<'SQL'
+SET SESSION sql_log_bin = 0;
+DROP DATABASE IF EXISTS shop;
+SQL
+
 echo "== dump を replica にコピーしてロード =="
-docker cp pt-source:/tmp/source-dump.sql /tmp/source-dump.sql
-docker cp /tmp/source-dump.sql pt-replica:/tmp/source-dump.sql
+docker cp pt-source:/tmp/source-dump.sql "$HOST_DUMP"
+docker cp "$HOST_DUMP" pt-replica:/tmp/source-dump.sql
 docker compose exec -T replica bash -lc "mysql -uroot -prootpass < /tmp/source-dump.sql"
 
 echo "== replica にレプリケーション設定を投入 =="
 $REPLICA <<SQL
-STOP REPLICA;
-RESET REPLICA ALL;
 CHANGE REPLICATION SOURCE TO
   SOURCE_HOST='source',
   SOURCE_USER='repl',
@@ -48,19 +55,18 @@ echo "== replica の状態 =="
 $REPLICA -e "SHOW REPLICA STATUS\G" 2>/dev/null \
   | grep -E "Replica_(IO|SQL)_Running|Seconds_Behind|Last_(IO|SQL)_Error|Source_Log_File|Read_Source_Log_Pos" || true
 
-echo "== replica にも toolkit/repl ユーザーを作成 (mysqldump --databases shop は mysql.user を含まないため) =="
+echo "== replica にも toolkit ユーザーを作成 (pt-table-sync が replica に接続するため) =="
 $REPLICA <<'SQL' 2>/dev/null
-CREATE USER IF NOT EXISTS 'repl'@'%' IDENTIFIED WITH mysql_native_password BY 'replpass';
-GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
 CREATE USER IF NOT EXISTS 'toolkit'@'%' IDENTIFIED WITH mysql_native_password BY 'toolkitpass';
 GRANT ALL PRIVILEGES ON *.* TO 'toolkit'@'%';
 FLUSH PRIVILEGES;
 SQL
 
 echo "== source で INSERT してレプリ反映を確認 =="
-$SOURCE -e "USE shop; INSERT INTO users (email, name) VALUES ('repltest@example.com','ReplTest');" 2>/dev/null
+REPL_TEST_EMAIL="repltest-$(date +%s)@example.com"
+$SOURCE -e "USE shop; INSERT INTO users (email, name) VALUES ('${REPL_TEST_EMAIL}','ReplTest');" 2>/dev/null
 sleep 1
-$REPLICA -e "USE shop; SELECT id, email, name FROM users WHERE email='repltest@example.com';" 2>/dev/null
+$REPLICA -e "USE shop; SELECT id, email, name FROM users WHERE email='${REPL_TEST_EMAIL}';" 2>/dev/null
 
 echo "== source からの SHOW REPLICAS で replica が見えるか確認 (report-host の効果) =="
 $SOURCE -e "SHOW REPLICAS;" 2>/dev/null
